@@ -1,7 +1,4 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 void main() {
   runApp(const CrackerApp());
@@ -15,38 +12,36 @@ class CrackerApp extends StatefulWidget {
 }
 
 class _CrackerAppState extends State<CrackerApp> {
-  CrackerType _selectedType = CrackerType.normal;
+  CrackerType _selected = CrackerType.normal;
 
-  void _openSelector(BuildContext context) async {
-    final selection = await Navigator.of(context).push<CrackerType>(
+  Future<void> _openSelector(BuildContext context) async {
+    final result = await Navigator.of(context).push<CrackerType>(
       MaterialPageRoute(
-        builder: (context) => CrackerSelectorPage(current: _selectedType),
+        builder: (_) => CrackerSelectionPage(current: _selected),
       ),
     );
-    if (selection != null && selection != _selectedType) {
-      setState(() {
-        _selectedType = selection;
-      });
+    if (result != null) {
+      setState(() => _selected = result);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Pull Cracker',
+      title: 'Cracker Experience',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepOrange),
         useMaterial3: true,
       ),
       home: CrackerExperiencePage(
-        type: _selectedType,
+        type: _selected,
         onSelectPressed: _openSelector,
       ),
     );
   }
 }
 
-class CrackerExperiencePage extends StatefulWidget {
+class CrackerExperiencePage extends StatelessWidget {
   const CrackerExperiencePage({
     super.key,
     required this.type,
@@ -57,301 +52,206 @@ class CrackerExperiencePage extends StatefulWidget {
   final void Function(BuildContext) onSelectPressed;
 
   @override
-  State<CrackerExperiencePage> createState() => _CrackerExperiencePageState();
-}
-
-class _CrackerExperiencePageState extends State<CrackerExperiencePage>
-    with TickerProviderStateMixin {
-  static const double _maxPull = 200;
-  static const double _fireThreshold = 140;
-  double _pullDistance = 0;
-  late AnimationController _returnController;
-  late Animation<double> _returnAnimation;
-  double _returnFrom = 0;
-  late AnimationController _confettiController;
-  List<_ConfettiPiece> _confetti = [];
-
-  @override
-  void initState() {
-    super.initState();
-    _returnController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 450),
-    );
-    _returnAnimation = CurvedAnimation(
-      parent: _returnController,
-      curve: Curves.elasticOut,
-    )..addListener(() {
-        setState(() {
-          _pullDistance = _returnFrom * (1 - _returnAnimation.value);
-        });
-      });
-
-    _confettiController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..addListener(() {
-        setState(() {});
-      });
-  }
-
-  @override
-  void dispose() {
-    _returnController.dispose();
-    _confettiController.dispose();
-    super.dispose();
-  }
-
-  void _handleDragUpdate(DragUpdateDetails details) {
-    setState(() {
-      _pullDistance = (_pullDistance - details.delta.dy).clamp(0, _maxPull);
-    });
-    if (_pullDistance >= _fireThreshold) {
-      _fireCracker();
-    }
-  }
-
-  void _handleDragEnd([DragEndDetails? _]) {
-    _animateBackToRest();
-  }
-
-  void _animateBackToRest() {
-    _returnFrom = _pullDistance;
-    _returnController
-      ..reset()
-      ..forward();
-  }
-
-  void _fireCracker() {
-    if (_confettiController.isAnimating) return;
-    HapticFeedback.mediumImpact();
-    // ignore: avoid_print
-    print('PAN!');
-    _spawnConfetti();
-    _confettiController
-      ..reset()
-      ..forward();
-    setState(() {
-      _pullDistance = 0;
-    });
-  }
-
-  void _spawnConfetti() {
-    final random = Random();
-    _confetti = List.generate(24, (index) {
-      final color = _confettiPalette[index % _confettiPalette.length];
-      return _ConfettiPiece(
-        color: color,
-        left: random.nextDouble(),
-        size: random.nextDouble() * 12 + 8,
-        sway: random.nextDouble() * 16 + 8,
-      );
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final wobble = sin(_pullDistance / 12) * (_pullDistance / 20 + 2);
-    final verticalWobble = cos(_pullDistance / 18) * 4;
-    final pullProgress = _pullDistance / _maxPull;
+    final style = type.style;
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('クラッカーで遊ぼう'),
-        actions: [
-          IconButton(
-            onPressed: () => widget.onSelectPressed(context),
-            icon: const Icon(Icons.celebration_outlined),
-            tooltip: 'クラッカーを選ぶ',
-          )
-        ],
-      ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final centerX = constraints.maxWidth / 2;
-          final baseY = constraints.maxHeight * 0.35 + verticalWobble;
-          final handleY = constraints.maxHeight * 0.8 - _pullDistance;
-          return Stack(
-            children: [
-              Positioned.fill(
-                child: CustomPaint(
-                  painter: _BackgroundPainter(),
+      backgroundColor: Colors.white,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFFFFF2E0), Color(0xFFFFE2C6)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
                 ),
               ),
-              if (_confetti.isNotEmpty)
-                ..._confetti.map((piece) {
-                  final progress = _confettiController.value;
-                  final y = (-50 + progress * constraints.maxHeight) +
-                      sin(progress * pi * 2) * 8;
-                  final x =
-                      (piece.left * constraints.maxWidth) + sin(progress * pi) * piece.sway;
-                  final opacity = 1 - progress;
-                  return Positioned(
-                    left: x,
-                    top: y,
-                    child: Opacity(
-                      opacity: opacity.clamp(0, 1),
+            ),
+          ),
+          SafeArea(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final centerX = constraints.maxWidth / 2;
+                return Stack(
+                  children: [
+                    Align(
+                      alignment: const Alignment(0, -0.2),
+                      child: CrackerPreview(style: style),
+                    ),
+                    Positioned(
+                      left: centerX - 2,
+                      right: centerX - 2,
+                      top: constraints.maxHeight * 0.45,
+                      bottom: constraints.maxHeight * 0.18,
                       child: Container(
-                        width: piece.size,
-                        height: piece.size * 1.3,
+                        width: 4,
                         decoration: BoxDecoration(
-                          color: piece.color,
-                          borderRadius: BorderRadius.circular(4),
+                          color: Colors.grey.shade300,
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
-                  );
-                }),
-              Positioned(
-                left: centerX - 32 + wobble,
-                top: baseY,
-                child: _CrackerBody(type: widget.type, pullProgress: pullProgress),
-              ),
-              Positioned(
-                left: centerX - 2,
-                top: baseY + 80,
-                bottom: constraints.maxHeight * 0.1,
-                child: Container(
-                  width: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade400,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: centerX - 22,
-                top: handleY,
-                child: GestureDetector(
-                  onVerticalDragUpdate: _handleDragUpdate,
-                  onVerticalDragEnd: _handleDragEnd,
-                  onVerticalDragCancel: _handleDragEnd,
-                  child: _PullHandle(pullAmount: _pullDistance),
-                ),
-              ),
-              Positioned(
-                left: 20,
-                bottom: 24,
-                right: 20,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    _PullMeter(value: pullProgress),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'つまみを上にドラッグするとクラッカーが揺れます。\n引っ張って発射させよう！',
-                      textAlign: TextAlign.center,
+                    Positioned(
+                      bottom: 120,
+                      left: 0,
+                      right: 0,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '引っ張って！',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          GestureDetector(
+                            onPanUpdate: (_) {},
+                            onPanStart: (_) {},
+                            onPanEnd: (_) {},
+                            child: const PullKnob(),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Positioned(
+                      left: 24,
+                      right: 24,
+                      bottom: 40,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'つまみをドラッグしてクラッカーを準備。\n後からアニメーションを追加できます。',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey.shade700),
+                          ),
+                          const SizedBox(height: 16),
+                          FilledButton.icon(
+                            onPressed: () => onSelectPressed(context),
+                            icon: const Icon(Icons.celebration_outlined),
+                            label: const Text('クラッカー変更'),
+                            style: FilledButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 24,
+                                vertical: 12,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
-                ),
-              )
-            ],
-          );
-        },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _PullHandle extends StatelessWidget {
-  const _PullHandle({required this.pullAmount});
+class CrackerPreview extends StatelessWidget {
+  const CrackerPreview({super.key, required this.style});
 
-  final double pullAmount;
+  final _CrackerStyle style;
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
-          width: 4,
-          height: pullAmount,
+          width: 140,
+          height: 90,
           decoration: BoxDecoration(
-            color: Colors.grey.shade500,
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.orange.shade400,
-            shape: BoxShape.circle,
+            color: style.baseColor,
+            gradient: style.gradient,
+            borderRadius: BorderRadius.circular(18),
             boxShadow: const [
               BoxShadow(
-                color: Colors.black26,
-                offset: Offset(0, 4),
-                blurRadius: 8,
+                color: Colors.black12,
+                blurRadius: 12,
+                offset: Offset(0, 8),
               ),
             ],
           ),
-          child: const Icon(Icons.keyboard_double_arrow_up_rounded,
-              color: Colors.white),
+          child: Center(
+            child: Text(
+              style.label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: Colors.amber.shade600,
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black26,
+                blurRadius: 8,
+                offset: Offset(0, 4),
+              ),
+            ],
+          ),
         ),
       ],
     );
   }
 }
 
-class _CrackerBody extends StatelessWidget {
-  const _CrackerBody({required this.type, required this.pullProgress});
-
-  final CrackerType type;
-  final double pullProgress;
+class PullKnob extends StatelessWidget {
+  const PullKnob({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final style = type.style;
-    final tilt = (pullProgress - 0.5) * 0.2;
-    return Transform.rotate(
-      angle: tilt,
-      child: Column(
-        children: [
-          Container(
-            width: 120,
-            height: 80,
-            decoration: BoxDecoration(
-              color: style.baseColor,
-              gradient: style.gradient,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 12,
-                  offset: Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(
-                style.label,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 1.2,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: Colors.amber.shade700,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.orange.shade400,
+        shape: BoxShape.circle,
+        boxShadow: const [
+          BoxShadow(
+            color: Colors.black26,
+            blurRadius: 10,
+            offset: Offset(0, 6),
           ),
         ],
+      ),
+      child: const Icon(
+        Icons.keyboard_double_arrow_up_rounded,
+        color: Colors.white,
+        size: 30,
       ),
     );
   }
 }
 
-class CrackerSelectorPage extends StatelessWidget {
-  const CrackerSelectorPage({super.key, required this.current});
+class CrackerSelectionPage extends StatelessWidget {
+  CrackerSelectionPage({super.key, required this.current});
 
   final CrackerType current;
+
+  final List<_CrackerOption> _options = [
+    _CrackerOption(type: CrackerType.normal, isLocked: false),
+    _CrackerOption(type: CrackerType.gold, isLocked: false),
+    _CrackerOption(type: CrackerType.rainbow, isLocked: true),
+    _CrackerOption(type: CrackerType.animal, isLocked: true),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -359,15 +259,19 @@ class CrackerSelectorPage extends StatelessWidget {
       appBar: AppBar(
         title: const Text('クラッカーを選択'),
       ),
-      body: ListView(
-        children: CrackerType.values
+      body: GridView.count(
+        padding: const EdgeInsets.all(16),
+        crossAxisCount: 2,
+        mainAxisSpacing: 16,
+        crossAxisSpacing: 16,
+        children: _options
             .map(
-              (type) => ListTile(
-                leading: CircleAvatar(backgroundColor: type.style.baseColor),
-                title: Text(type.style.label),
-                trailing:
-                    current == type ? const Icon(Icons.check, color: Colors.green) : null,
-                onTap: () => Navigator.of(context).pop(type),
+              (option) => _CrackerTile(
+                option: option,
+                isSelected: current == option.type,
+                onTap: option.isLocked
+                    ? null
+                    : () => Navigator.of(context).pop(option.type),
               ),
             )
             .toList(),
@@ -376,48 +280,112 @@ class CrackerSelectorPage extends StatelessWidget {
   }
 }
 
-class _PullMeter extends StatelessWidget {
-  const _PullMeter({required this.value});
+class _CrackerTile extends StatelessWidget {
+  const _CrackerTile({
+    required this.option,
+    required this.isSelected,
+    this.onTap,
+  });
 
-  final double value;
+  final _CrackerOption option;
+  final bool isSelected;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: LinearProgressIndicator(
-        value: value,
-        minHeight: 12,
-        backgroundColor: Colors.grey.shade200,
-        color: Colors.orange.shade400,
+    final style = option.type.style;
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: style.gradient ??
+                  LinearGradient(
+                    colors: [style.baseColor, style.baseColor.withOpacity(0.85)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black12,
+                  blurRadius: 8,
+                  offset: Offset(0, 4),
+                ),
+              ],
+            ),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withOpacity(0.2),
+                        border: Border.all(color: Colors.white70, width: 2),
+                      ),
+                      child: const Icon(
+                        Icons.celebration,
+                        color: Colors.white,
+                        size: 18,
+                      ),
+                    ),
+                    if (option.isLocked)
+                      const Icon(Icons.lock, color: Colors.white)
+                    else if (isSelected)
+                      const Icon(Icons.check_circle, color: Colors.white)
+                    else
+                      const SizedBox.shrink(),
+                  ],
+                ),
+                const Spacer(),
+                Text(
+                  style.label,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  option.isLocked ? 'ロック中' : 'タップして選択',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (option.isLocked)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.25),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 }
 
-class _BackgroundPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..shader = const LinearGradient(
-        colors: [Color(0xFFFFF5E6), Color(0xFFFFE4C7)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawRect(Offset.zero & size, paint);
+class _CrackerOption {
+  const _CrackerOption({
+    required this.type,
+    required this.isLocked,
+  });
 
-    final circlePaint = Paint()..color = Colors.white.withOpacity(0.3);
-    for (var i = 0; i < 18; i++) {
-      final random = Random(i * 7);
-      final radius = random.nextDouble() * 32 + 16;
-      final dx = random.nextDouble() * size.width;
-      final dy = random.nextDouble() * size.height;
-      canvas.drawCircle(Offset(dx, dy), radius, circlePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  final CrackerType type;
+  final bool isLocked;
 }
 
 enum CrackerType { normal, gold, rainbow, animal }
@@ -433,18 +401,18 @@ extension on CrackerType {
       case CrackerType.gold:
         return _CrackerStyle(
           label: '金',
-          baseColor: Colors.amber.shade600,
-          gradient: LinearGradient(
-            colors: [Colors.amber.shade700, Colors.amber.shade300],
+          baseColor: Colors.amber.shade500,
+          gradient: const LinearGradient(
+            colors: [Color(0xFFFFD56F), Color(0xFFFFB347)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
         );
       case CrackerType.rainbow:
-        return _CrackerStyle(
+        return const _CrackerStyle(
           label: '虹',
-          baseColor: Colors.purple,
-          gradient: const LinearGradient(
+          baseColor: Color(0xFF9B6CF7),
+          gradient: LinearGradient(
             colors: [
               Color(0xFFFF5F6D),
               Color(0xFFFFC371),
@@ -460,9 +428,9 @@ extension on CrackerType {
           label: '動物',
           baseColor: Colors.teal.shade400,
           gradient: const LinearGradient(
-            colors: [Color(0xFF6DC8F3), Color(0xFF73A1F9)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
+            colors: [Color(0xFF7AE8C5), Color(0xFF2AC4A2)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         );
     }
@@ -470,7 +438,7 @@ extension on CrackerType {
 }
 
 class _CrackerStyle {
-  _CrackerStyle({
+  const _CrackerStyle({
     required this.label,
     required this.baseColor,
     this.gradient,
@@ -480,28 +448,3 @@ class _CrackerStyle {
   final Color baseColor;
   final Gradient? gradient;
 }
-
-class _ConfettiPiece {
-  _ConfettiPiece({
-    required this.color,
-    required this.left,
-    required this.size,
-    required this.sway,
-  });
-
-  final Color color;
-  final double left;
-  final double size;
-  final double sway;
-}
-
-const _confettiPalette = [
-  Color(0xFFF94144),
-  Color(0xFFF3722C),
-  Color(0xFFF8961E),
-  Color(0xFF43AA8B),
-  Color(0xFF577590),
-  Color(0xFF277DA1),
-  Color(0xFFD62828),
-  Color(0xFF90BE6D),
-];
