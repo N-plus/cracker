@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 void main() {
@@ -41,7 +43,7 @@ class _CrackerAppState extends State<CrackerApp> {
   }
 }
 
-class CrackerExperiencePage extends StatelessWidget {
+class CrackerExperiencePage extends StatefulWidget {
   const CrackerExperiencePage({
     super.key,
     required this.type,
@@ -52,8 +54,30 @@ class CrackerExperiencePage extends StatelessWidget {
   final void Function(BuildContext) onSelectPressed;
 
   @override
+  State<CrackerExperiencePage> createState() => _CrackerExperiencePageState();
+}
+
+class _CrackerExperiencePageState extends State<CrackerExperiencePage> {
+  double _pull = 0.0;
+  static const double maxPull = 160;
+
+  void _handlePanUpdate(DragUpdateDetails details) {
+    setState(() {
+      final updated = (_pull + details.delta.dy).clamp(0, maxPull);
+      _pull = updated.toDouble();
+    });
+  }
+
+  void _handlePanEnd(DragEndDetails _) {
+    // TODO: Trigger fire animation and effects when _pull reaches a threshold.
+    setState(() {
+      _pull = 0.0;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final style = type.style;
+    final style = widget.type.style;
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -73,17 +97,27 @@ class CrackerExperiencePage extends StatelessWidget {
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final centerX = constraints.maxWidth / 2;
+                final barTop = constraints.maxHeight * 0.45;
+                final barBottom = constraints.maxHeight * 0.18;
+                final knobBaseBottom = 120.0;
+                final pullRate = _pull / maxPull;
+                final wiggleX = math.sin(pullRate * math.pi) * 8;
+                final wiggleY = -4 * pullRate;
+
                 return Stack(
                   children: [
                     Align(
                       alignment: const Alignment(0, -0.2),
-                      child: CrackerPreview(style: style),
+                      child: Transform.translate(
+                        offset: Offset(wiggleX, wiggleY),
+                        child: CrackerPreview(style: style),
+                      ),
                     ),
                     Positioned(
                       left: centerX - 2,
                       right: centerX - 2,
-                      top: constraints.maxHeight * 0.45,
-                      bottom: constraints.maxHeight * 0.18,
+                      top: barTop,
+                      bottom: barBottom,
                       child: Container(
                         width: 4,
                         decoration: BoxDecoration(
@@ -93,7 +127,7 @@ class CrackerExperiencePage extends StatelessWidget {
                       ),
                     ),
                     Positioned(
-                      bottom: 120,
+                      bottom: math.max(0, knobBaseBottom - _pull),
                       left: 0,
                       right: 0,
                       child: Column(
@@ -109,10 +143,12 @@ class CrackerExperiencePage extends StatelessWidget {
                           ),
                           const SizedBox(height: 12),
                           GestureDetector(
-                            onPanUpdate: (_) {},
-                            onPanStart: (_) {},
-                            onPanEnd: (_) {},
-                            child: const PullKnob(),
+                            onPanUpdate: _handlePanUpdate,
+                            onPanEnd: _handlePanEnd,
+                            child: Transform.translate(
+                              offset: Offset(0, _pull * 0.05),
+                              child: const PullKnob(),
+                            ),
                           ),
                         ],
                       ),
@@ -131,7 +167,7 @@ class CrackerExperiencePage extends StatelessWidget {
                           ),
                           const SizedBox(height: 16),
                           FilledButton.icon(
-                            onPressed: () => onSelectPressed(context),
+                            onPressed: () => widget.onSelectPressed(context),
                             icon: const Icon(Icons.celebration_outlined),
                             label: const Text('クラッカー変更'),
                             style: FilledButton.styleFrom(
